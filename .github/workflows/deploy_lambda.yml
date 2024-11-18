@@ -21,5 +21,6 @@ jobs:
           aws-region: eu-west-1
 
       - run: |
+          cd task_1/sam-app-19
           sam build
           sam deploy --no-confirm-changeset --no-fail-on-empty-changeset
