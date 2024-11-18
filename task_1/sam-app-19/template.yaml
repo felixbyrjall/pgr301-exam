@@ -1,0 +1,49 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  Generate Image from POST
+
+Globals:
+  Function:
+    Timeout: 60
+    MemorySize: 256
+
+Resources:
+  GenerateImageFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: generate_image/
+      Handler: app.lambda_handler
+      Layers:
+        - !Sub arn:aws:lambda:${AWS::Region}:017000801446:layer:AWSLambdaPowertoolsPython:31
+      Runtime: python3.11
+      Architectures:
+        - x86_64
+      Role: arn:aws:iam::244530008913:role/GenerateImageLambdaRole
+      Environment:
+        Variables:
+          S3_BUCKET_NAME: pgr301-couch-explorers
+          MODEL_ID: amazon.titan-image-generator-v1
+      Policies:
+        - S3WritePolicy:
+            BucketName: pgr301-couch-explorers
+        - Statement:
+            Effect: Allow
+            Action:
+              - "bedrock:InvokeModel"
+            Resource: "*"
+      Events:
+        GenerateImageApi:
+          Type: Api
+          Properties:
+            Path: /generate-image
+            Method: post
+
+Outputs:
+  GenerateImatgeApi:
+    Description: "API Gateway endpoint URL for the image generation function"
+    Value: !Sub "https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/generate-image/"
+  GenerateImageFunction:
+    Description: "Generate Image Lambda Function ARN"
+    Value: !GetAtt GenerateImageFunction.Arn
+
