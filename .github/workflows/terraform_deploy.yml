@@ -23,17 +23,17 @@ jobs:
 
       - name: Terraform Init
         run: |
-          cd task_2/infra
+          cd task_2_and_4/infra
           terraform init
 
       - name: Terraform Plan
         if: github.ref != 'refs/heads/main'
         run: |
-          cd task_2/infra
+          cd task_2_and_4/infra
           terraform plan
 
       - name: Terraform Apply
         if: github.ref == 'refs/heads/main'
         run: |
-          cd task_2/infra
+          cd task_2_and_4/infra
           terraform apply -auto-approve
