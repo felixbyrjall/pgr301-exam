@@ -21,6 +21,11 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: eu-west-1
 
+      - name: Generate terraform.tfvars
+        run: |
+          cd task_2_and_4/infra
+          echo 'notification_email = "${{ secrets.NOTIFICATION_EMAIL }}"' > terraform.tfvars
+
       - name: Terraform Init
         run: |
           cd task_2_and_4/infra
