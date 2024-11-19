@@ -1,2 +1,10 @@
 .aws-sam
 events/
+*.terraform/
+*.tfstate
+*.tfstate.*
+terraform.tfvars
+.terraform.lock.hcl
+*bin/
+*six.py
+*.zip
