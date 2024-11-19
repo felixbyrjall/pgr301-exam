@@ -169,3 +169,38 @@ output "lambda_function_name" {
   value = aws_lambda_function.image_processor.function_name
   description = "Name of the Lambda function"
 }
+
+############################ Task 4 ############################
+# Variables
+variable "notification_email" {
+  description = "Email address to receive CloudWatch alarm notifications"
+  type        = string
+}
+
+# SNS Configuration
+resource "aws_sns_topic" "sqs_alarm_topic" {
+  name = "sqs-alarm-topic"
+}
+
+resource "aws_sns_topic_subscription" "sqs_alarm_email_subscription" {
+  topic_arn = aws_sns_topic.sqs_alarm_topic.arn
+  protocol  = "email"
+  endpoint  = var.notification_email
+}
+
+# CloudWatch Alarms
+resource "aws_cloudwatch_metric_alarm" "sqs_oldest_message_age" {
+  alarm_name          = "SQS-OldestMessageAge-Alarm"
+  comparison_operator = "GreaterThanOrEqualToThreshold"
+  evaluation_periods  = 1
+  threshold           = 5
+  metric_name         = "ApproximateAgeOfOldestMessage"
+  namespace           = "AWS/SQS"
+  period              = 60
+  statistic           = "Maximum"
+  dimensions = {
+    QueueName = "image-generation-queue-19"
+  }
+
+  alarm_actions = [aws_sns_topic.sqs_alarm_topic.arn]
+}
