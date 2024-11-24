@@ -14,8 +14,6 @@ Resources:
     Properties:
       CodeUri: generate_image/
       Handler: app.lambda_handler
-      Layers:
-        - !Sub arn:aws:lambda:${AWS::Region}:017000801446:layer:AWSLambdaPowertoolsPython:31
       Runtime: python3.11
       Architectures:
         - x86_64
@@ -24,14 +22,6 @@ Resources:
         Variables:
           S3_BUCKET_NAME: pgr301-couch-explorers
           MODEL_ID: amazon.titan-image-generator-v1
-      Policies:
-        - S3WritePolicy:
-            BucketName: pgr301-couch-explorers
-        - Statement:
-            Effect: Allow
-            Action:
-              - "bedrock:InvokeModel"
-            Resource: "*"
       Events:
         GenerateImageApi:
           Type: Api
