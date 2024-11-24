@@ -1,4 +1,3 @@
-############################ Task 2 ############################
 terraform {
   required_version = ">= 1.9"
   required_providers {
@@ -19,18 +18,23 @@ provider "aws" {
   region = "eu-west-1"
 }
 
-# SQS Queue with specific timeout for Lambda processing
+# Variables
+variable "notification_email" {
+  description = "Email address to receive CloudWatch alarm notifications"
+  type        = string
+}
+
+# SQS Queue
 resource "aws_sqs_queue" "image_queue" {
   name                       = "image-generation-queue-19"
-  visibility_timeout_seconds = 70  # Slightly longer than Lambda timeout
-  message_retention_seconds  = 1209600  # 14 days
-  receive_wait_time_seconds  = 20  # Enable long polling
+  visibility_timeout_seconds = 70
+  message_retention_seconds  = 1209600
+  receive_wait_time_seconds  = 20
 }
 
 # Base Lambda role
 resource "aws_iam_role" "lambda_role" {
   name = "image_processor_lambda_role_19"
-  path = "/service-role/"
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
@@ -46,7 +50,7 @@ resource "aws_iam_role" "lambda_role" {
 
 # CloudWatch Logs policy
 resource "aws_iam_role_policy" "lambda_logs" {
-  name = "lambda_cloudwatch_logs_19"
+  name = "lambda_logs_policy_19"
   role = aws_iam_role.lambda_role.id
 
   policy = jsonencode({
@@ -59,17 +63,15 @@ resource "aws_iam_role_policy" "lambda_logs" {
           "logs:CreateLogStream",
           "logs:PutLogEvents"
         ]
-        Resource = [
-          "arn:aws:logs:eu-west-1:*:log-group:/aws/lambda/image-processor-19:*"
-        ]
+        Resource = ["arn:aws:logs:eu-west-1:*:log-group:/aws/lambda/image-processor-19:*"]
       }
     ]
   })
 }
 
-# SQS specific policy
+# SQS policy
 resource "aws_iam_role_policy" "lambda_sqs" {
-  name = "lambda_sqs_19"
+  name = "lambda_sqs_policy_19"
   role = aws_iam_role.lambda_role.id
 
   policy = jsonencode({
@@ -88,9 +90,9 @@ resource "aws_iam_role_policy" "lambda_sqs" {
   })
 }
 
-# S3 specific policy
+# S3 policy
 resource "aws_iam_role_policy" "lambda_s3" {
-  name = "lambda_s3_19"
+  name = "lambda_s3_policy_19"
   role = aws_iam_role.lambda_role.id
 
   policy = jsonencode({
@@ -105,9 +107,9 @@ resource "aws_iam_role_policy" "lambda_s3" {
   })
 }
 
-# Bedrock specific policy
+# Bedrock policy
 resource "aws_iam_role_policy" "lambda_bedrock" {
-  name = "lambda_bedrock_19"
+  name = "lambda_bedrock_policy_19"
   role = aws_iam_role.lambda_role.id
 
   policy = jsonencode({
@@ -131,53 +133,29 @@ resource "aws_lambda_function" "image_processor" {
   handler         = "lambda_sqs.lambda_handler"
   runtime         = "python3.11"
   timeout         = 60
-  memory_size     = 256
 
   environment {
     variables = {
       BUCKET_NAME = "pgr301-couch-explorers"
     }
   }
-
-  # Add tracing config if needed
-  tracing_config {
-    mode = "Active"
-  }
 }
 
-# Lambda trigger for SQS with specific batch size
+# Lambda trigger for SQS
 resource "aws_lambda_event_source_mapping" "sqs_trigger" {
-  event_source_arn        = aws_sqs_queue.image_queue.arn
-  function_name          = aws_lambda_function.image_processor.arn
-  batch_size            = 1
+  event_source_arn = aws_sqs_queue.image_queue.arn
+  function_name    = aws_lambda_function.image_processor.arn
+  batch_size       = 1
 }
 
-# Lambda function code with dependencies
+# Lambda function code
 data "archive_file" "lambda_zip" {
   type        = "zip"
   output_path = "${path.module}/lambda_function.zip"
-  source_dir  = "."
-  excludes    = ["*.tf", "*.zip", ".terraform", ".terraform.lock.hcl"]
+  source_file = "${path.module}/lambda_sqs.py"
 }
 
-output "sqs_queue_url" {
-  value = aws_sqs_queue.image_queue.url
-  description = "URL of the SQS queue for image processing"
-}
-
-output "lambda_function_name" {
-  value = aws_lambda_function.image_processor.function_name
-  description = "Name of the Lambda function"
-}
-
-############################ Task 4 ############################
-# Variables
-variable "notification_email" {
-  description = "Email address to receive CloudWatch alarm notifications"
-  type        = string
-}
-
-# SNS Configuration
+# SNS Topic for alerts
 resource "aws_sns_topic" "sqs_alarm_topic" {
   name = "sqs-alarm-topic"
 }
@@ -188,19 +166,24 @@ resource "aws_sns_topic_subscription" "sqs_alarm_email_subscription" {
   endpoint  = var.notification_email
 }
 
-# CloudWatch Alarms
+# CloudWatch Alarm
 resource "aws_cloudwatch_metric_alarm" "sqs_oldest_message_age" {
   alarm_name          = "SQS-OldestMessageAge-Alarm"
   comparison_operator = "GreaterThanOrEqualToThreshold"
   evaluation_periods  = 1
-  threshold           = 5
+  threshold           = 10  # 10 seconds
   metric_name         = "ApproximateAgeOfOldestMessage"
   namespace           = "AWS/SQS"
   period              = 60
-  statistic           = "Maximum"
+  statistic          = "Maximum"
   dimensions = {
-    QueueName = "image-generation-queue-19"
+    QueueName = aws_sqs_queue.image_queue.name
   }
-
   alarm_actions = [aws_sns_topic.sqs_alarm_topic.arn]
+}
+
+# Output URL
+output "sqs_queue_url" {
+  value = aws_sqs_queue.image_queue.url
+  description = "URL of the SQS queue for image processing"
 }
